@@ -74,9 +74,11 @@ if ( ! function_exists( 'inspiry_load_translation_from_child' ) ) {
 
 //properties api to insert data
 function insert_property_data($property_data) {
-    // Prepare the post data for inserting the property
+    // Check if a post with this ListingKey already exists
+    $existing_post_id = check_for_existing_property($property_data['ListingKey']);
+
+    // Prepare the post data for inserting/updating the property
     $post_data = array(
-        'ID' => 4947, // Use the existing post ID to avoid duplication
         'post_title' => $property_data['UnparsedAddress'], // Using the UnparsedAddress as the title
         'post_content' => $property_data['PublicRemarks'], // Description or remarks as the content
         'post_status' => 'publish', // You can set it to 'draft' if you don't want it published immediately
@@ -88,17 +90,134 @@ function insert_property_data($property_data) {
         'post_modified_gmt' => gmdate('Y-m-d H:i:s', strtotime($property_data['ModificationTimestamp'])),
     );
 
-    // Update the post (instead of insert) to avoid duplication
-    $post_id = wp_update_post($post_data);
+    if ($existing_post_id) {
+        // Update the post if it already exists
+        $post_data['ID'] = $existing_post_id;
+        $post_id = wp_update_post($post_data);
+    } else {
+        // Insert a new post if it doesn't exist
+        $post_id = wp_insert_post($post_data);
+    }
 
     if ($post_id) {
-        // Now, insert the custom fields into postmeta
-		//add_property_meta_data($post_id, $property_data);
-		//handle_property_subtype($post_id, $property_data);
-		//update_features($post_id, $property_data);
-		//update_addition_details($post_id, $property_data);
-		insert_property_images($post_id, $property_data['Media']);
+        // Add/update ListingKey in post meta
+        update_post_meta($post_id, 'REAL_HOMES_listing_key', $property_data['ListingKey']);
+
+        // Now, insert/update the custom fields into postmeta
+        add_property_meta_data($post_id, $property_data);
+        handle_property_subtype($post_id, $property_data);
+        update_features($post_id, $property_data);
+        update_addition_details($post_id, $property_data);
+        insert_property_images($post_id, $property_data['Media']);
+		handle_property_city($post_id, $property_data);
+		handle_property_status($post_id, $property_data);
     }
+}
+
+function handle_property_status($post_id, $property_data) {
+    global $wpdb;
+    
+    if (isset($property_data['StandardStatus'])) {
+        $status_name = $property_data['StandardStatus'];
+
+        // Check if the status already exists in the terms table
+        $term = $wpdb->get_row($wpdb->prepare("
+            SELECT term_id FROM {$wpdb->prefix}terms WHERE name = %s
+        ", $status_name));
+
+        if (!$term) {
+            // The status doesn't exist, so insert it
+            $insert_result = $wpdb->insert("{$wpdb->prefix}terms", [
+                'name' => $status_name,
+                'slug' => sanitize_title($status_name),
+                'term_group' => 0
+            ]);
+
+            // Proceed only if the term was inserted successfully
+            if ($insert_result === false) {
+                error_log("Failed to insert property status into terms table: " . $wpdb->last_error);
+                return;  // Exit if there was an error
+            }
+
+            // Get the inserted term_id
+            $term_id = $wpdb->insert_id;
+
+            // Insert into the term_taxonomy table for 'property-status'
+            $wpdb->insert("{$wpdb->prefix}term_taxonomy", [
+                'term_id' => $term_id,
+                'taxonomy' => 'property-status',
+                'description' => '',
+                'parent' => 0,
+                'count' => 0
+            ]);
+
+            $term_taxonomy_id = $wpdb->insert_id;
+
+        } else {
+            // If the term exists, get its term_id
+            $term_id = $term->term_id;
+
+            // Get the term_taxonomy_id for the 'property-status' taxonomy
+            $term_taxonomy = $wpdb->get_row($wpdb->prepare("
+                SELECT term_taxonomy_id FROM {$wpdb->prefix}term_taxonomy 
+                WHERE term_id = %d 
+                AND taxonomy = %s 
+                LIMIT 1", $term_id, 'property-status'
+            ));
+
+            if (!$term_taxonomy) {
+                // If term_taxonomy doesn't exist, insert it
+                $wpdb->insert("{$wpdb->prefix}term_taxonomy", [
+                    'term_id' => $term_id,
+                    'taxonomy' => 'property-status',
+                    'description' => '',
+                    'parent' => 0,
+                    'count' => 0
+                ]);
+
+                $term_taxonomy_id = $wpdb->insert_id;
+            } else {
+                $term_taxonomy_id = $term_taxonomy->term_taxonomy_id;
+            }
+        }
+
+        // Now, save the term relationship with term_relationships (with dynamic table prefix)
+        $existing_relationship = $wpdb->get_row($wpdb->prepare("
+            SELECT * FROM {$wpdb->prefix}term_relationships WHERE object_id = %d AND term_taxonomy_id = %d
+        ", $post_id, $term_taxonomy_id));
+
+        // Insert into term_relationships if the relationship does not exist
+        if (!$existing_relationship) {
+            $wpdb->insert("{$wpdb->prefix}term_relationships", [
+                'object_id' => $post_id,
+                'term_taxonomy_id' => $term_taxonomy_id,
+                'term_order' => 0
+            ]);
+
+            // Log an error if the insert fails
+            if ($wpdb->insert_id === false) {
+                error_log("Failed to insert into term_relationships for property status: " . $wpdb->last_error);
+            }
+        }
+
+        // Optionally, log successful relationship insertion for debugging
+        // error_log("Property status term and relationship processed for post_id: {$post_id}, term_taxonomy_id: {$term_taxonomy_id}");
+    }
+}
+
+// Helper function to check if a property with the given ListingKey exists
+function check_for_existing_property($listing_key) {
+    global $wpdb;
+
+    // Query to find a post ID with the given ListingKey in post meta
+    $post_id = $wpdb->get_var($wpdb->prepare("
+        SELECT post_id FROM {$wpdb->postmeta}
+        WHERE meta_key = 'REAL_HOMES_listing_key'
+        AND meta_value = %s
+        LIMIT 1
+    ", $listing_key));
+
+    return $post_id;
 }
 
 function add_property_meta_data($post_id, $property_data) {
@@ -871,6 +990,97 @@ function insert_property_images( $post_id, $media_array ) {
     }
 }
 
+function handle_property_city($post_id, $property_data) {
+    global $wpdb;
+    
+    if (isset($property_data['City'])) {
+        $city_name = $property_data['City'];
+
+        // Check if the City already exists in the terms table
+        $term = $wpdb->get_row($wpdb->prepare("
+            SELECT term_id FROM {$wpdb->prefix}terms WHERE name = %s
+        ", $city_name));
+
+        if (!$term) {
+            // The city doesn't exist, so insert it
+            $insert_result = $wpdb->insert("{$wpdb->prefix}terms", [
+                'name' => $city_name,
+                'slug' => sanitize_title($city_name),
+                'term_group' => 0
+            ]);
+
+            // Proceed only if the term was inserted successfully
+            if ($insert_result === false) {
+                error_log("Failed to insert city into terms table: " . $wpdb->last_error);
+                return;  // Exit if there was an error
+            }
+
+            // Get the inserted term_id
+            $term_id = $wpdb->insert_id;
+
+            // Insert into the term_taxonomy table for 'property-city'
+            $wpdb->insert("{$wpdb->prefix}term_taxonomy", [
+                'term_id' => $term_id,
+                'taxonomy' => 'property-city',
+                'description' => '',
+                'parent' => 0,
+                'count' => 0
+            ]);
+
+            $term_taxonomy_id = $wpdb->insert_id;
+
+        } else {
+            // If the term exists, get its term_id
+            $term_id = $term->term_id;
+
+            // Get the term_taxonomy_id for the 'property-city' taxonomy
+            $term_taxonomy = $wpdb->get_row($wpdb->prepare("
+                SELECT term_taxonomy_id FROM {$wpdb->prefix}term_taxonomy 
+                WHERE term_id = %d 
+                AND taxonomy = %s 
+                LIMIT 1", $term_id, 'property-city'
+            ));
+
+            if (!$term_taxonomy) {
+                // If term_taxonomy doesn't exist, insert it
+                $wpdb->insert("{$wpdb->prefix}term_taxonomy", [
+                    'term_id' => $term_id,
+                    'taxonomy' => 'property-city',
+                    'description' => '',
+                    'parent' => 0,
+                    'count' => 0
+                ]);
+
+                $term_taxonomy_id = $wpdb->insert_id;
+            } else {
+                $term_taxonomy_id = $term_taxonomy->term_taxonomy_id;
+            }
+        }
+
+        // Now, save the term relationship with term_relationships (with dynamic table prefix)
+        $existing_relationship = $wpdb->get_row($wpdb->prepare("
+            SELECT * FROM {$wpdb->prefix}term_relationships WHERE object_id = %d AND term_taxonomy_id = %d
+        ", $post_id, $term_taxonomy_id));
+
+        // Insert into term_relationships if the relationship does not exist
+        if (!$existing_relationship) {
+            $wpdb->insert("{$wpdb->prefix}term_relationships", [
+                'object_id' => $post_id,
+                'term_taxonomy_id' => $term_taxonomy_id,
+                'term_order' => 0
+            ]);
+
+            // Log an error if the insert fails
+            if ($wpdb->insert_id === false) {
+                error_log("Failed to insert into term_relationships: " . $wpdb->last_error);
+            }
+        }
+
+        // Optionally, log successful relationship insertion for debugging
+        // error_log("City term and relationship processed for post_id: {$post_id}, term_taxonomy_id: {$term_taxonomy_id}");
+    }
+}
+
 function handle_property_subtype($post_id, $property_data) {
     global $wpdb;
     
@@ -911,60 +1121,6 @@ function handle_property_subtype($post_id, $property_data) {
             ]);
         }
     }
-}
-
-function get_access_token() {
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => 'https://identity.crea.ca/connect/token',
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 0,
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => 'POST',
-      CURLOPT_POSTFIELDS => 'client_id=Ans5thODup8PzA8sPiJLvTyq&client_secret=K586spBextHUkimpCY1xzzU7&grant_type=client_credentials&scope=DDFApi_Read',
-      CURLOPT_HTTPHEADER => array(
-        'Content-Type: application/x-www-form-urlencoded',
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    curl_close($curl);
-
-    $response_data = json_decode($response, true);
-    
-    if(isset($response_data['access_token'])) {
-        return $response_data['access_token'];
-    } else {
-        // Handle error or no token found
-        return false;
-    }
-}
-
-function get_property_data($access_token) {
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => 'https://api.crea.ca/odata/v1/Property?$top=10&$filter=City eq \'Edmonton\'',  // Example URL
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 0,
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => 'GET',
-      CURLOPT_HTTPHEADER => array(
-        'Authorization: Bearer ' . $access_token,
-      ),
-    ));
-
-    $response = curl_exec($curl);
-    curl_close($curl);
-
-    return json_decode($response, true);  // Decoded API response
 }
 
 // Example usage
@@ -1118,4 +1274,155 @@ $property_data = [
 ];
 
 //insert_property_data($property_data);
+// Register the API route
+add_action('rest_api_init', function () {
+    register_rest_route('property/v1', '/insert/', array(
+        'methods' => 'get',
+        'callback' => 'insert_property_api',
+        'permission_callback' => '__return_true',
+    ));
+});
 
+function insert_property_api(WP_REST_Request $request) {
+    // Fetch the limit from the request or set a default value (e.g., 10 for testing)
+    $limit = $request->get_param('limit') ? intval($request->get_param('limit')) : 10;
+
+    // Set $limit to null for unlimited
+    $is_unlimited = $limit === 0;
+
+    // Get or refresh the access token
+    $access_token = get_access_token(true);
+
+    if (!$access_token) {
+        return rest_ensure_response(array(
+            'status' => 'error',
+            'message' => 'Failed to get access token'
+        ));
+    }
+
+    // Start fetching property data
+    $api_url = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=' . ($is_unlimited ? '100' : $limit) . '&$skip=0&$count=true&$filter=City%20eq%20%27Edmonton%27';
+
+    // Track the number of properties processed
+    $total_processed = 0;
+
+    // Loop through the API until there's no nextLink
+    while ($api_url) {
+        $response_data = get_property_data($access_token, $api_url);
+
+        // Check if the access token has expired (HTTP 401 error)
+        if (isset($response_data['error']) && $response_data['error']['code'] === '401') {
+            // Refresh the access token
+            $access_token = get_access_token(true);
+            if (!$access_token) {
+                return rest_ensure_response(array(
+                    'status' => 'error',
+                    'message' => 'Failed to refresh access token'
+                ));
+            }
+            // Retry the request with the new access token
+            $response_data = get_property_data($access_token, $api_url);
+        }
+
+        // Check for errors in the API response
+        if (isset($response_data['error'])) {
+            return rest_ensure_response(array(
+                'status' => 'error',
+                'message' => $response_data['error']['message'],
+                'code' => $response_data['error']['code']
+            ));
+        }
+
+        // Extract the properties from the response
+        if (isset($response_data['value']) && is_array($response_data['value'])) {
+            foreach ($response_data['value'] as $property_data) {
+                // Pass each property to the function for inserting into the database
+                insert_property_data($property_data);
+                $total_processed++;
+            }
+        }
+
+        // If there's a next link and we're in "unlimited" mode, continue fetching
+        if (isset($response_data['@odata.nextLink']) && ($is_unlimited || $total_processed < $limit)) {
+            $api_url = $response_data['@odata.nextLink'];
+        } else {
+            // No more nextLink or limit reached, exit the loop
+            $api_url = null;
+        }
+
+        // If the total processed equals the limit, exit the loop in case of limited requests
+        if (!$is_unlimited && $total_processed >= $limit) {
+            break;
+        }
+    }
+
+    return rest_ensure_response(array(
+        'status' => 'success',
+        'message' => 'Properties inserted successfully',
+        'total_processed' => $total_processed
+    ));
+}
+
+// Function to get access token and refresh if necessary
+function get_access_token($force_refresh = false) {
+    $access_token = get_transient('crea_access_token');
+
+    // If token is expired or forced to refresh, regenerate it
+    if ($force_refresh || !$access_token) {
+        $curl = curl_init();
+
+        curl_setopt_array($curl, array(
+            CURLOPT_URL => 'https://identity.crea.ca/connect/token',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 10,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'POST',
+            CURLOPT_POSTFIELDS => 'client_id=Ans5thODup8PzA8sPiJLvTyq&client_secret=K586spBextHUkimpCY1xzzU7&grant_type=client_credentials&scope=DDFApi_Read',
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/x-www-form-urlencoded',
+            ),
+        ));
+
+        $response = curl_exec($curl);
+        curl_close($curl);
+
+        $response_data = json_decode($response, true);
+
+        if (isset($response_data['access_token'])) {
+            // Save the access token and expiration time (minus a small buffer)
+            set_transient('crea_access_token', $response_data['access_token'], 3600 - 300); // Save for 55 minutes
+            return $response_data['access_token'];
+        } else {
+            return false;
+        }
+    }
+
+    return $access_token;
+}
+
+// Function to get property data
+function get_property_data($access_token, $api_url) {
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+        CURLOPT_URL => $api_url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_ENCODING => '',
+        CURLOPT_MAXREDIRS => 10,
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+        CURLOPT_CUSTOMREQUEST => 'GET',
+        CURLOPT_HTTPHEADER => array(
+            'Authorization: Bearer ' . $access_token,
+        ),
+    ));
+
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+    return json_decode($response, true);  // Decoded API response
+}
