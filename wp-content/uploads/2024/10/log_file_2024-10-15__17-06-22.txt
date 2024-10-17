@@ -1,0 +1,108 @@
+
+---Downloaded files---
+The import files for: Ultra - Elementor were successfully downloaded!
+Initial max execution time = 120
+Files info:
+Site URL = http://localhost/myworkplace/bookingview
+Data file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-ultra/contents.xml
+Widget file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-ultra/widgets.wie
+Customizer file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-ultra/customizer.dat
+Redux files:
+not defined!
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+---Importing widgets---
+Default Sidebar : 
+
+Block - No Title - Widget already exists
+Block - No Title - Widget already exists
+RealHomes - Agents List - Agents - Imported
+RealHomes - Property Types - Property Types - Imported
+RealHomes - Featured Properties - Featured Properties - Imported
+RealHomes - Contact Form - Contact Us - Imported
+
+Pages Sidebar : 
+
+RealHomes - Featured Properties - Featured Properties - Imported
+RealHomes - Contact Form - Contact Us - Imported
+
+Property Sidebar : 
+
+RealHomes - Featured Properties - Featured Properties - Imported
+RealHomes - Property Types - Property Types - Imported
+RealHomes - Advance Search Widget - Find Your Home - Imported
+
+Properties Pages Sidebar : 
+
+RealHomes - Agents List - Agents - Imported
+RealHomes - Property Types - Property Types - Imported
+RealHomes - Advance Search Widget - Find Your Home - Imported
+
+Footer First Column : 
+
+Text - No Title - Imported
+
+Footer Second Column : 
+
+Navigation Menu - No Title - Imported
+
+Footer Third Column : 
+
+Search - No Title - Imported
+
+Agent Sidebar : 
+
+RealHomes - Featured Properties - Featured Properties - Imported
+RealHomes - Property Types - Property Types - Imported
+
+Agency Sidebar : 
+
+RealHomes - Agents List - Agents - Imported
+RealHomes - Property Types - Property Types - Imported
+
+
+
+---Importing customizer settings---
+Customizer settings import finished!
+
+---ocdi/after_import---
+

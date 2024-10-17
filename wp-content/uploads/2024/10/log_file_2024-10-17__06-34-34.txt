@@ -1,0 +1,113 @@
+
+---Downloaded files---
+The import files for: Modern 05 - Elementor were successfully downloaded!
+Initial max execution time = 120
+Files info:
+Site URL = http://localhost/myworkplace/bookingview
+Data file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-modern-05/contents.xml
+Widget file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-modern-05/widgets.wie
+Customizer file = /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-content/plugins/realhomes-demo-import/demos/elementor-modern-05/customizer.dat
+Redux files:
+not defined!
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+------
+New AJAX call!
+
+
+---Importing widgets---
+Default Sidebar : 
+
+Block - No Title - Widget already exists
+Block - No Title - Widget already exists
+Block - No Title - Widget already exists
+RealHomes - Agents List - No Title - Imported
+RealHomes - Featured Properties - Featured Properties - Imported
+Search - No Title - Imported
+Categories - No Title - Imported
+
+Pages Sidebar : 
+
+Block - No Title - Widget already exists
+Block - No Title - Widget already exists
+RealHomes - Agents List - No Title - Imported
+RealHomes - Featured Properties - Featured Properties - Imported
+
+Property Sidebar : 
+
+RealHomes - Featured Properties - Featured Properties - Imported
+
+Properties Pages Sidebar : 
+
+RealHomes - Agents List - No Title - Imported
+RealHomes - Property Types - Property Types - Widget already exists
+RealHomes - Featured Properties - Featured Properties - Imported
+
+Footer First Column : 
+
+Navigation Menu - Quick Links - Imported
+
+Footer Second Column : 
+
+RealHomes - Contact Information - No Title - Imported
+
+Footer Third Column : 
+
+Tag Cloud - No Title - Imported
+
+Agent Sidebar : 
+
+RealHomes - Agent Featured Properties - Featured Properties - Imported
+RealHomes - Property Types - No Title - Imported
+
+Agency Sidebar : 
+
+RealHomes - Featured Properties - Featured Properties - Imported
+RealHomes - Property Types - Property Types - Widget already exists
+
+
+
+---Importing customizer settings---
+Customizer settings import finished!
+
+---ocdi/after_import---
+
