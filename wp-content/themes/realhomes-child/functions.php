@@ -913,6 +913,60 @@ function handle_property_subtype($post_id, $property_data) {
     }
 }
 
+function get_access_token() {
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+      CURLOPT_URL => 'https://identity.crea.ca/connect/token',
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_ENCODING => '',
+      CURLOPT_MAXREDIRS => 10,
+      CURLOPT_TIMEOUT => 0,
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+      CURLOPT_CUSTOMREQUEST => 'POST',
+      CURLOPT_POSTFIELDS => 'client_id=Ans5thODup8PzA8sPiJLvTyq&client_secret=K586spBextHUkimpCY1xzzU7&grant_type=client_credentials&scope=DDFApi_Read',
+      CURLOPT_HTTPHEADER => array(
+        'Content-Type: application/x-www-form-urlencoded',
+      ),
+    ));
+
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+    $response_data = json_decode($response, true);
+    
+    if(isset($response_data['access_token'])) {
+        return $response_data['access_token'];
+    } else {
+        // Handle error or no token found
+        return false;
+    }
+}
+
+function get_property_data($access_token) {
+    $curl = curl_init();
+
+    curl_setopt_array($curl, array(
+      CURLOPT_URL => 'https://api.crea.ca/odata/v1/Property?$top=10&$filter=City eq \'Edmonton\'',  // Example URL
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_ENCODING => '',
+      CURLOPT_MAXREDIRS => 10,
+      CURLOPT_TIMEOUT => 0,
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+      CURLOPT_CUSTOMREQUEST => 'GET',
+      CURLOPT_HTTPHEADER => array(
+        'Authorization: Bearer ' . $access_token,
+      ),
+    ));
+
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+    return json_decode($response, true);  // Decoded API response
+}
+
 // Example usage
 $property_data = [
     // Data extracted from the JSON array
