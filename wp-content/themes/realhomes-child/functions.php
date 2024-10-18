@@ -1273,7 +1273,6 @@ $property_data = [
 	]
 ];
 
-//insert_property_data($property_data);
 // Register the API route
 add_action('rest_api_init', function () {
     register_rest_route('property/v1', '/insert/', array(
@@ -1284,93 +1283,101 @@ add_action('rest_api_init', function () {
 });
 
 function insert_property_api(WP_REST_Request $request) {
-    // Fetch the limit from the request or set a default value (e.g., 10 for testing)
-    $limit = $request->get_param('limit') ? intval($request->get_param('limit')) : 10;
+    global $wpdb;
 
-    // Set $limit to null for unlimited
-    $is_unlimited = $limit === 0;
+    // Fetch the limit for each batch
+    $limit = 5; // Set a limit for each batch
 
-    // Get or refresh the access token
-    $access_token = get_access_token(true);
+    // Fetch total count once
+    $api_url_count = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=1&$count=true&$filter=City%20eq%20%27Edmonton%27';
+    
+    // Fetch the total records from the API
+    $response_count = get_property_data(get_access_token(), $api_url_count);
 
-    if (!$access_token) {
+    // Debug: Log the response from the API count request
+    error_log('API Count Response: ' . print_r($response_count, true));
+
+    // Check if the response contains the correct count
+    $total_records = isset($response_count['@odata.count']) ? intval($response_count['@odata.count']) : 0;
+
+    // Debug: Log the total records
+    error_log('Total Records: ' . $total_records);
+
+    // Get last skip value from the database
+    $table_name = $wpdb->prefix . 'property_import_status';
+    $last_status = $wpdb->get_row("SELECT last_skip_value FROM $table_name ORDER BY id DESC LIMIT 1");
+    $last_skip_value = $last_status ? $last_status->last_skip_value : 0;
+
+    // Debug: Log the last skip value
+    error_log('Last Skip Value: ' . $last_skip_value);
+
+    // If the last skip value exceeds or equals the total records, stop the process
+    if ($last_skip_value >= $total_records) {
         return rest_ensure_response(array(
-            'status' => 'error',
-            'message' => 'Failed to get access token'
+            'status' => 'completed',
+            'message' => 'All properties have been inserted.',
+            'total_records' => $total_records,
+            'last_processed' => $last_skip_value
         ));
     }
 
-    // Start fetching property data
-    $api_url = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=' . ($is_unlimited ? '100' : $limit) . '&$skip=0&$count=true&$filter=City%20eq%20%27Edmonton%27';
+    // Start fetching property data from the last skip value
+    $api_url = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=' . $limit . '&$skip=' . $last_skip_value . '&$count=true&$filter=City%20eq%20%27Edmonton%27';
 
-    // Track the number of properties processed
+    // Loop through the API and insert records
+    $response_data = get_property_data(get_access_token(), $api_url);
     $total_processed = 0;
 
-    // Loop through the API until there's no nextLink
-    while ($api_url) {
-        $response_data = get_property_data($access_token, $api_url);
-
-        // Check if the access token has expired (HTTP 401 error)
-        if (isset($response_data['error']) && $response_data['error']['code'] === '401') {
-            // Refresh the access token
-            $access_token = get_access_token(true);
-            if (!$access_token) {
-                return rest_ensure_response(array(
-                    'status' => 'error',
-                    'message' => 'Failed to refresh access token'
-                ));
-            }
-            // Retry the request with the new access token
-            $response_data = get_property_data($access_token, $api_url);
-        }
-
-        // Check for errors in the API response
-        if (isset($response_data['error'])) {
-            return rest_ensure_response(array(
-                'status' => 'error',
-                'message' => $response_data['error']['message'],
-                'code' => $response_data['error']['code']
-            ));
-        }
-
-        // Extract the properties from the response
-        if (isset($response_data['value']) && is_array($response_data['value'])) {
-            foreach ($response_data['value'] as $property_data) {
-                // Pass each property to the function for inserting into the database
-                insert_property_data($property_data);
-                $total_processed++;
-            }
-        }
-
-        // If there's a next link and we're in "unlimited" mode, continue fetching
-        if (isset($response_data['@odata.nextLink']) && ($is_unlimited || $total_processed < $limit)) {
-            $api_url = $response_data['@odata.nextLink'];
-        } else {
-            // No more nextLink or limit reached, exit the loop
-            $api_url = null;
-        }
-
-        // If the total processed equals the limit, exit the loop in case of limited requests
-        if (!$is_unlimited && $total_processed >= $limit) {
-            break;
+    if (isset($response_data['value']) && is_array($response_data['value'])) {
+        foreach ($response_data['value'] as $property_data) {
+            insert_property_data($property_data);
+            $total_processed++;
         }
     }
 
+    // Update the last skip value in the database
+    $new_skip_value = $last_skip_value + $total_processed;
+    $wpdb->insert($table_name, array(
+        'last_skip_value' => $new_skip_value,
+    ));
+
     return rest_ensure_response(array(
         'status' => 'success',
-        'message' => 'Properties inserted successfully',
-        'total_processed' => $total_processed
+        'message' => 'Properties inserted successfully.',
+        'processed' => $total_processed,
+        'next_skip_value' => $new_skip_value
     ));
+}
+
+// Function to get the last processed skip value from the database
+function get_last_skip_value() {
+    global $wpdb;
+    $skip_value = $wpdb->get_var("SELECT last_skip_value FROM {$wpdb->prefix}property_import_status LIMIT 1");
+    return $skip_value ? intval($skip_value) : 0;
+}
+
+// Function to update the last processed skip value in the database
+function update_last_skip_value($new_skip_value) {
+    global $wpdb;
+    $existing = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}property_import_status");
+
+    if ($existing > 0) {
+        $wpdb->update("{$wpdb->prefix}property_import_status", array(
+            'last_skip_value' => $new_skip_value
+        ), array('id' => 1));
+    } else {
+        $wpdb->insert("{$wpdb->prefix}property_import_status", array(
+            'last_skip_value' => $new_skip_value
+        ));
+    }
 }
 
 // Function to get access token and refresh if necessary
 function get_access_token($force_refresh = false) {
     $access_token = get_transient('crea_access_token');
 
-    // If token is expired or forced to refresh, regenerate it
     if ($force_refresh || !$access_token) {
         $curl = curl_init();
-
         curl_setopt_array($curl, array(
             CURLOPT_URL => 'https://identity.crea.ca/connect/token',
             CURLOPT_RETURNTRANSFER => true,
@@ -1392,8 +1399,7 @@ function get_access_token($force_refresh = false) {
         $response_data = json_decode($response, true);
 
         if (isset($response_data['access_token'])) {
-            // Save the access token and expiration time (minus a small buffer)
-            set_transient('crea_access_token', $response_data['access_token'], 3600 - 300); // Save for 55 minutes
+            set_transient('crea_access_token', $response_data['access_token'], 3600 - 300);
             return $response_data['access_token'];
         } else {
             return false;
@@ -1406,7 +1412,6 @@ function get_access_token($force_refresh = false) {
 // Function to get property data
 function get_property_data($access_token, $api_url) {
     $curl = curl_init();
-
     curl_setopt_array($curl, array(
         CURLOPT_URL => $api_url,
         CURLOPT_RETURNTRANSFER => true,
@@ -1426,3 +1431,32 @@ function get_property_data($access_token, $api_url) {
 
     return json_decode($response, true);  // Decoded API response
 }
+
+function create_property_import_status_table() {
+    global $wpdb;
+
+    // Get the table name with the correct prefix
+    $table_name = $wpdb->prefix . 'property_import_status';
+
+    // Check if the table exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") != $table_name) {
+        // SQL query to create the table
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        $sql = "CREATE TABLE $table_name (
+            id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            last_skip_value BIGINT(20) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) $charset_collate;";
+        
+        // Include the file for dbDelta
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        
+        // Execute the query to create the table
+        dbDelta($sql);
+    }
+}
+
+// Hook the function to run on theme activation
+add_action('after_setup_theme', 'create_property_import_status_table');

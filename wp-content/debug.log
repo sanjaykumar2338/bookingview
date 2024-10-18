@@ -1,0 +1,1 @@
+[18-Oct-2024 07:19:09 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-includes/class-wpdb.php:1845) in /Applications/XAMPP/xamppfiles/htdocs/myworkplace/bookingview/wp-includes/rest-api/class-wp-rest-server.php on line 1831
