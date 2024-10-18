@@ -1001,6 +1001,9 @@ $property_data = [
 	]
 ];
 
+// Set unlimited execution time for long-running sync processes
+set_time_limit(0);
+
 // Register the API route
 add_action('rest_api_init', function () {
     register_rest_route('property/v1', '/insert/', array(
@@ -1027,7 +1030,7 @@ function insert_property_api(WP_REST_Request $request) {
 
         $total_records = isset($response_count['@odata.count']) ? intval($response_count['@odata.count']) : 0;
 
-        // Initialize the sync process (set all properties to unseen)
+        // Step 1: Reset seen status for all properties (set seen to 0)
         reset_property_seen_status();
 
         // Get last skip value from the database
@@ -1037,7 +1040,7 @@ function insert_property_api(WP_REST_Request $request) {
 
         // If the last skip value exceeds or equals the total records, stop the process
         if ($last_skip_value >= $total_records) {
-            // After processing, clean up unseen properties
+            // Step 4: After processing, clean up unseen properties
             delete_unseen_properties();
 
             return rest_ensure_response(array(
@@ -1048,7 +1051,7 @@ function insert_property_api(WP_REST_Request $request) {
             ));
         }
 
-        // Start fetching property data from the last skip value
+        // Step 2: Start fetching property data from the last skip value
         $api_url = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=' . $limit . '&$skip=' . $last_skip_value . '&$count=true&$filter=City%20eq%20%27Edmonton%27';
         $response_data = get_property_data(get_access_token(), $api_url);
 
@@ -1060,7 +1063,7 @@ function insert_property_api(WP_REST_Request $request) {
 
         foreach ($response_data['value'] as $property_data) {
             insert_property_data($property_data);
-            mark_property_as_seen($property_data['ListingKey']); // Mark the property as seen
+            mark_property_as_seen($property_data['ListingKey']); // Step 3: Mark the property as seen
             $total_processed++;
         }
 
@@ -1090,38 +1093,24 @@ function insert_property_api(WP_REST_Request $request) {
 // Mark a property as seen during the current sync
 function mark_property_as_seen($listing_key) {
     global $wpdb;
-    $wpdb->update(
-        "{$wpdb->prefix}postmeta",
-        array('meta_value' => 'seen'), // Mark as 'seen'
-        array('meta_key' => 'REAL_HOMES_listing_key', 'meta_value' => $listing_key)
-    );
+    $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}postmeta pm
+		INNER JOIN {$wpdb->prefix}posts p ON pm.post_id = p.ID
+		SET p.seen = 1
+		WHERE pm.meta_key = 'REAL_HOMES_listing_key' AND pm.meta_value = %s", $listing_key));
 }
 
 // Reset the seen status before each sync
 function reset_property_seen_status() {
     global $wpdb;
-    $wpdb->update(
-        "{$wpdb->prefix}postmeta",
-        array('meta_value' => 'unseen'), // Mark all as 'unseen'
-        array('meta_key' => 'REAL_HOMES_listing_key')
-    );
+    $wpdb->query("UPDATE {$wpdb->prefix}posts SET seen = 0 WHERE post_type = 'property'");
 }
 
 // After the sync, delete all properties that are not marked as seen
 function delete_unseen_properties() {
     global $wpdb;
-    
-    // Get all post IDs with 'unseen' status
-    $unseen_posts = $wpdb->get_col("
-        SELECT post_id FROM {$wpdb->prefix}postmeta
-        WHERE meta_key = 'REAL_HOMES_listing_key' AND meta_value = 'unseen'
-    ");
-
-    // Delete each post that wasn't seen
-    foreach ($unseen_posts as $post_id) {
-        wp_delete_post($post_id, true); // Force delete
-        error_log("Deleted unseen property with post_id: {$post_id}");
-    }
+    $wpdb->query("DELETE p, pm FROM {$wpdb->prefix}posts p
+		LEFT JOIN {$wpdb->prefix}postmeta pm ON p.ID = pm.post_id
+		WHERE p.post_type = 'property' AND p.seen = 0");
 }
 
 // Function to get the last processed skip value from the database
@@ -1249,3 +1238,25 @@ function create_property_import_status_table() {
 
 // Hook the function to run on theme activation
 add_action('after_setup_theme', 'create_property_import_status_table');
+
+// Function to add the 'seen' column to wp_posts if it doesn't exist
+function add_seen_column_to_wp_posts() {
+    global $wpdb;
+
+    $table_name = $wpdb->prefix . 'posts';
+
+    // Check if the 'seen' column already exists in the wp_posts table
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM {$table_name} LIKE 'seen'");
+    
+    if (empty($column_exists)) {
+        // SQL query to add the 'seen' column
+        $sql = "ALTER TABLE {$table_name} ADD COLUMN seen TINYINT(1) DEFAULT 0";
+        
+        // Run the query to add the column
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        $wpdb->query($sql);
+    }
+}
+
+// Hook the function to run on theme activation
+add_action('after_setup_theme', 'add_seen_column_to_wp_posts');
