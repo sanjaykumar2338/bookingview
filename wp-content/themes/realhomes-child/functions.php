@@ -77,6 +77,7 @@ function insert_property_data($property_data) {
     try {
         // Check if a post with this ListingKey already exists
         $existing_post_id = check_for_existing_property($property_data['ListingKey']);
+        $custom_slug = generate_custom_slug($property_data);
 
         // Prepare the post data for inserting/updating the property
         $post_data = array(
@@ -89,6 +90,7 @@ function insert_property_data($property_data) {
             'post_date_gmt' => gmdate('Y-m-d H:i:s', strtotime($property_data['OriginalEntryTimestamp'])),
             'post_modified' => date('Y-m-d H:i:s', strtotime($property_data['ModificationTimestamp'])),
             'post_modified_gmt' => gmdate('Y-m-d H:i:s', strtotime($property_data['ModificationTimestamp'])),
+            //'post_name' => $custom_slug,
         );
 
         if ($existing_post_id) {
@@ -100,9 +102,19 @@ function insert_property_data($property_data) {
             $post_id = wp_insert_post($post_data);
         }
 
+        echo $post_id;
+
         if ($post_id) {
             // Add/update ListingKey in post meta
             update_post_meta($post_id, 'REAL_HOMES_listing_key', $property_data['ListingKey']);
+            update_post_meta($post_id, 'custom_permalink', $custom_slug);
+
+            $meta_title = "For Sale: " . $property_data['UnparsedAddress'] . " " . $property_data['City'] . " AB - Bookviewing";
+            $meta_description = "Explore this property located at " . $property_data['UnparsedAddress'] . " in " . $property_data['City'] . ", Alberta. Find out more about this " . $property_data['PropertySubType'] . " property on Bookviewing.";
+
+            // Save custom meta for title and description
+            update_post_meta($post_id, '_custom_meta_title', $meta_title);
+            update_post_meta($post_id, '_custom_meta_description', $meta_description);
 
             // Now, insert/update the custom fields into postmeta
             add_property_meta_data($post_id, $property_data);
@@ -131,6 +143,22 @@ function insert_property_data($property_data) {
         // Log the error in the custom daily log file
         file_put_contents($log_file, date('Y-m-d H:i:s') . " - Error with ListingKey {$property_data['ListingKey']}: " . $e->getMessage() . "\n", FILE_APPEND);
     }
+}
+
+function generate_custom_slug($property_data) {
+    // Define a function to clean and remove special characters
+    function clean_slug_part($part) {
+        return preg_replace('/[^A-Za-z0-9-]/', '', strtolower(str_replace(' ', '-', $part)));
+    }
+
+    // Clean and process each part of the slug
+    $city = isset($property_data['City']) ? clean_slug_part($property_data['City']) : 'unknown-city';
+    $city_region = isset($property_data['CityRegion']) ? clean_slug_part($property_data['CityRegion']) : 'unknown-region';
+    $property_type = isset($property_data['PropertySubType']) ? clean_slug_part($property_data['PropertySubType']) : 'unknown-type';
+    $address = isset($property_data['UnparsedAddress']) ? clean_slug_part($property_data['UnparsedAddress']) : 'unknown-address';
+
+    // Construct the custom slug with cleaned parts
+    return "ab/{$city}/{$city_region}/{$property_type}-for-sale/{$address}";
 }
 
 function handle_property_status($post_id, $property_data) {
@@ -345,6 +373,8 @@ function add_property_meta_data($post_id, $property_data) {
             update_post_meta($post_id, 'REAL_HOMES_property_lot_size_postfix', $property_data['LotSizeUnits']);
         }
 
+        update_post_meta($post_id, 'REAL_HOMES_property_city_region', $property_data['CityRegion']);
+
     } catch (Exception $e) {
         // Log the error in the default WordPress debug log
         error_log('Error in add_property_meta_data for post_id ' . $post_id . ': ' . $e->getMessage());
@@ -493,6 +523,7 @@ function update_addition_details($post_id, $property_data) {
         }
 
         // Save additional details as post meta
+        $additional_details[] = array('Powered by Rrealtor.ca', $property_data['ListingURL']);
         update_post_meta($post_id, 'REAL_HOMES_additional_details_list', $additional_details);
 
     } catch (Exception $e) {
@@ -805,6 +836,10 @@ function handle_property_subtype($post_id, $property_data) {
         if (isset($property_data['PropertySubType'])) {
             $property_subtype = $property_data['PropertySubType'];
 
+            if($property_subtype=='Vacant Land'){
+                $property_subtype = 'Land';
+            }
+
             // Check if the PropertySubType already exists in the bv_terms table using dynamic table prefix
             $term = $wpdb->get_row($wpdb->prepare("
                 SELECT term_id FROM {$wpdb->prefix}terms WHERE name = %s
@@ -1019,7 +1054,7 @@ function insert_property_api(WP_REST_Request $request) {
 
     try {
         // Fetch the limit for each batch
-        $limit = 10; // Set a limit for each batch
+        $limit = 1; // Set a limit for each batch
 
         // Fetch total count once
         $api_url_count = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=1&$count=true&$filter=City%20eq%20%27Edmonton%27';
@@ -1261,3 +1296,22 @@ function add_seen_column_to_wp_posts() {
 
 // Hook the function to run on theme activation
 add_action('after_setup_theme', 'add_seen_column_to_wp_posts');
+
+function custom_property_meta_tags() {
+    if (is_singular('property')) {
+        global $post;
+        
+        // Retrieve custom meta title and description
+        $meta_title = get_post_meta($post->ID, '_custom_meta_title', true);
+        $meta_description = get_post_meta($post->ID, '_custom_meta_description', true);
+
+        if ($meta_title) {
+            echo '<title>' . esc_html($meta_title) . '</title>' . "\n";
+        }
+
+        if ($meta_description) {
+            echo '<meta name="description" content="' . esc_attr($meta_description) . '">' . "\n";
+        }
+    }
+}
+add_action('wp_head', 'custom_property_meta_tags');
