@@ -146,11 +146,6 @@ function insert_property_data($property_data) {
 }
 
 function generate_custom_slug($property_data) {
-    // Define a function to clean and remove special characters
-    function clean_slug_part($part) {
-        return preg_replace('/[^A-Za-z0-9-]/', '', strtolower(str_replace(' ', '-', $part)));
-    }
-
     // Clean and process each part of the slug
     $city = isset($property_data['City']) ? clean_slug_part($property_data['City']) : 'unknown-city';
     $city_region = isset($property_data['CityRegion']) ? clean_slug_part($property_data['CityRegion']) : 'unknown-region';
@@ -159,6 +154,10 @@ function generate_custom_slug($property_data) {
 
     // Construct the custom slug with cleaned parts
     return "ab/{$city}/{$city_region}/{$property_type}-for-sale/{$address}";
+}
+
+function clean_slug_part($part) {
+    return preg_replace('/[^A-Za-z0-9-]/', '', strtolower(str_replace(' ', '-', $part)));
 }
 
 function handle_property_status($post_id, $property_data) {
