@@ -102,7 +102,7 @@ function insert_property_data($property_data) {
             $post_id = wp_insert_post($post_data);
         }
 
-        echo $post_id;
+        //echo $post_id;
 
         if ($post_id) {
             // Add/update ListingKey in post meta
@@ -1054,7 +1054,7 @@ function insert_property_api(WP_REST_Request $request) {
 
     try {
         // Fetch the limit for each batch
-        $limit = 1; // Set a limit for each batch
+        $limit = 10; // Set a limit for each batch
 
         // Fetch total count once
         $api_url_count = 'https://ddfapi.realtor.ca/odata/v1/Property?$top=1&$count=true&$filter=City%20eq%20%27Edmonton%27';
