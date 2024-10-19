@@ -1,2 +1,4 @@
 wp-content/plugins/easy-real-estate/includes/mb/main/inc/fields/map.php
 wp-content/uploads/*
+wp-config.php
+wp-content/debug.log
