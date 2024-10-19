@@ -1002,6 +1002,7 @@ $property_data = [
 ];
 
 // Set unlimited execution time for long-running sync processes
+ignore_user_abort(true);
 set_time_limit(0);
 
 // Register the API route
