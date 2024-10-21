@@ -152,6 +152,22 @@ function generate_custom_slug($property_data) {
     $property_type = isset($property_data['PropertySubType']) ? clean_slug_part($property_data['PropertySubType']) : 'unknown-type';
     $address = isset($property_data['UnparsedAddress']) ? clean_slug_part($property_data['UnparsedAddress']) : 'unknown-address';
 
+    // Handle specific property types
+    switch ($property_data['PropertySubType']) {
+        case 'Single Family':
+            $property_type = clean_slug_part('Single Family homes');
+            break;
+        case 'Condomiumium':
+            $property_type = clean_slug_part('condos');
+            break;
+        case 'Land':
+            $property_type = clean_slug_part('land');
+            break;
+        case 'Commercial':
+            $property_type = clean_slug_part('commercial');
+            break;
+    }
+
     // Construct the custom slug with cleaned parts
     return "ab/{$city}/{$city_region}/{$property_type}-for-sale/{$address}";
 }
@@ -522,7 +538,7 @@ function update_addition_details($post_id, $property_data) {
         }
 
         // Save additional details as post meta
-        $additional_details[] = array('Powered by Rrealtor.ca', $property_data['ListingURL']);
+        $additional_details[] = array('Powered by Realtor.ca', $property_data['ListingURL']);
         update_post_meta($post_id, 'REAL_HOMES_additional_details_list', $additional_details);
 
     } catch (Exception $e) {

@@ -26,16 +26,32 @@ if ( ! empty( $additional_details ) ) {
 		}
 
 		echo '<div class="rh-property-additional-inner-wrap"><ul class="rh_property__additional clearfix">';
-		foreach ( $additional_details as $detail ) {
-			?>
-            <li>
-                <span class="title"><?php echo esc_html( $detail[0] ); ?>:</span>
-                <span class="value"><?php echo esc_html( $detail[1] ); ?></span>
-            </li>
-			<?php
-		}
-		echo '</ul></div>';
+			$property_link = '';
+			foreach ( $additional_details as $detail ) {
+				?>
+				<li>
+					<?php 
+					if ( strcasecmp( trim($detail[0]), 'Powered by Realtor.ca' ) === 0 ) { 
+						$property_link = esc_url( $detail[1] );
+					?>
+						<!-- Disclaimer div -->
+						<div class="disclaimerlogo">
+							<a alt="Powered by: REALTOR.ca" target="_blank" rel="noopener noreferrer" href="<?php echo $property_link; ?>">
+								<img src="https://www.realtor.ca/images/en-ca/powered_by_realtor.svg" width="125" height="60">
+							</a>
+						</div>
+					<?php } else { ?>
+						<span class="title"><?php echo esc_html( $detail[0] ); ?>:</span>
+						<span class="value"><?php echo esc_html( $detail[1] ); ?></span>
+					<?php } ?>
+				</li>
+				<?php
+			}
+			echo '</ul></div>';
+
 		?>
+
+		<br>
     </div>
 	<?php
 }

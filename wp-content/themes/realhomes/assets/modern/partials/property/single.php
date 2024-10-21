@@ -396,12 +396,16 @@ if ( ! function_exists( 'elementor_theme_do_location' ) || ! elementor_theme_do_
 										 *
 										 * If comments are open or we have at least one comment, load up the comment template.
 										 */
+
+										/** HIDE THE COMMENT SECTION **/
 										if ( comments_open() || get_comments_number() ) {
+											if(false){
 											?>
                                             <div class="property-comments">
 												<?php comments_template(); ?>
                                             </div>
 											<?php
+											}
 										}
 										?>
                                     </section>
@@ -409,6 +413,13 @@ if ( ! function_exists( 'elementor_theme_do_location' ) || ! elementor_theme_do_
 
 								<?php // Data attributes to trigger sticky sidebar js plugin. ?>
                                 <div class="rh_property__sidebar" data-sticky="true" data-top-gap="60" data-bottom-gap="60">
+									
+									<section class="schedule_a_tour">
+										<div>
+											<?php echo do_shortcode('[schedule_tour]'); ?>
+										</div>	
+									</section>
+									
 									<?php
 									if ( 'agent-in-sidebar' === $theme_property_detail_variation ) {
 										?>
