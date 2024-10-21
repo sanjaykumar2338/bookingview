@@ -24,7 +24,7 @@
                 <input type="time" id="tourTime" name="tour_time" class="form-control" required>
             </div>
 
-            <button id="nextStep" type="button" class="btn btn-primary">Next</button>
+            <button id="nextStep" type="button" class="rh-btn rh-btn-primary">Next</button>
         </div>
 
         <!-- Step 2: Personal Details (Initially hidden) -->
@@ -47,8 +47,8 @@
             <input type="hidden" name="action" value="tour_form"> <!-- Hidden action field -->
             <input type="hidden" name="post_id" value="<?php echo get_the_ID(); ?>"> <!-- To save the post ID -->
 
-            <button type="submit" name="tour_submit" class="btn btn-success">Schedule</button>
-            <button id="backStep" type="button" class="btn btn-secondary">Back</button>
+            <button type="submit" name="tour_submit" class="rh-btn rh-btn-primary">Schedule</button>
+            <button id="backStep" type="button" class="rh-btn rh-btn-primary">Back</button>
         </div>
     </form>
 </div>
@@ -78,7 +78,7 @@
 
     #tourForm button {
         padding: 10px 20px;
-        background-color: #4CAF50;
+        background-color: #1CB2FF;
         color: white;
         border: none;
         border-radius: 3px;
@@ -86,7 +86,7 @@
     }
 
     #tourForm button:hover {
-        background-color: #3e8e41;
+        background-color: #1CB2FF;
     }
 
     .schedule_a_tour {
