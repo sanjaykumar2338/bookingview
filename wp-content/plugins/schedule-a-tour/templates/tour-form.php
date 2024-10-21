@@ -164,5 +164,5 @@
                 successMessage.remove();
             }, 500); // Allow for transition to complete
         }
-    }, 3000);
+    }, 6000);
 </script>
