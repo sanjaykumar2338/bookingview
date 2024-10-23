@@ -124,6 +124,20 @@ function insert_property_data($property_data) {
             insert_property_images($post_id, $property_data['Media']);
             handle_property_city($post_id, $property_data);
             handle_property_status($post_id, $property_data);
+
+            //FOR THE PROPERTY TYPES
+            $property_subtype = $property_data['PropertySubType'];
+            //echo "<pre><br>"; echo $property_subtype;
+
+            if($property_subtype=='Single Family'){
+                $property_subtype = 'Single Family Home';
+            }
+
+            if($property_subtype=='Multi-family'){
+                $property_subtype = 'Multi Family Home';
+            }
+
+            check_and_insert_property_type_and_relationship($property_subtype, $post_id);
         }
     } catch (Exception $e) {
         // Define the path to the log folder
@@ -145,6 +159,97 @@ function insert_property_data($property_data) {
     }
 }
 
+function check_and_insert_property_type_and_relationship($term_name, $post_id, $taxonomy = 'property-type') {
+    global $wpdb;
+
+    try {
+        // Step 1: Check if there are multiple terms with the same name
+        $terms = $wpdb->get_results($wpdb->prepare("
+            SELECT * FROM `{$wpdb->prefix}terms` 
+            WHERE `name` = %s", $term_name
+        ));
+
+        $term_taxonomy_id = null;
+
+        if ($terms) {
+            // Step 2: Loop through all terms and check for a matching taxonomy in the term_taxonomy table
+            foreach ($terms as $term) {
+                $term_taxonomy = $wpdb->get_row($wpdb->prepare("
+                    SELECT * FROM `{$wpdb->prefix}term_taxonomy` 
+                    WHERE `term_id` = %d 
+                    AND `taxonomy` = %s 
+                    LIMIT 1", $term->term_id, $taxonomy
+                ));
+
+                if ($term_taxonomy) {
+                    // Step 3: If we found a term with the correct taxonomy, use its term_taxonomy_id
+                    $term_taxonomy_id = $term_taxonomy->term_taxonomy_id;
+                    break; // We found the correct term, so we can stop searching
+                }
+            }
+        }
+
+        // Step 4: If no term exists in the desired taxonomy, insert a new term and taxonomy
+        if (!$term_taxonomy_id) {
+            // Insert a new term into the terms table
+            $wpdb->insert("{$wpdb->prefix}terms", array(
+                'name' => $term_name,
+                'slug' => sanitize_title($term_name),
+                'term_group' => 0
+            ));
+
+            // Get the newly inserted term_id
+            $term_id = $wpdb->insert_id;
+
+            // Insert into term_taxonomy table
+            $wpdb->insert("{$wpdb->prefix}term_taxonomy", array(
+                'term_id' => $term_id,
+                'taxonomy' => $taxonomy,
+                'description' => '',
+                'parent' => 0, // Adjust parent if necessary
+                'count' => 0
+            ));
+
+            // Get the term_taxonomy_id of the newly created term
+            $term_taxonomy_id = $wpdb->insert_id;
+        }
+
+        // Step 5: Check if the relationship already exists in term_relationships
+        $relationship = $wpdb->get_row($wpdb->prepare("
+            SELECT * FROM `{$wpdb->prefix}term_relationships` 
+            WHERE `object_id` = %d 
+            AND `term_taxonomy_id` = %d 
+            LIMIT 1", $post_id, $term_taxonomy_id
+        ));
+
+        if (!$relationship) {
+            // Step 6: If no relationship exists, insert it into term_relationships
+            $wpdb->insert("{$wpdb->prefix}term_relationships", array(
+                'object_id' => $post_id, // This is the post ID
+                'term_taxonomy_id' => $term_taxonomy_id,
+                'term_order' => 0
+            ));
+        }
+
+        return $term_taxonomy_id; // Return term_taxonomy_id for further use
+
+    } catch (Exception $e) {
+        // Log the error
+        error_log("Error in check_and_insert_property_type_and_relationship for term: {$term_name}. Error: " . $e->getMessage());
+
+        // Optional: Write to a custom log file
+        $log_folder = ABSPATH . 'wp-content/uploads/property_logs/';
+        if (!file_exists($log_folder)) {
+            mkdir($log_folder, 0755, true);
+        }
+        $log_file = $log_folder . 'property_term_log_' . date('Y-m-d') . '.log';
+        file_put_contents($log_file, date('Y-m-d H:i:s') . " - Error checking/inserting term {$term_name}: " . $e->getMessage() . "\n", FILE_APPEND);
+
+        // Return null or false on failure
+        return null;
+    }
+}
+
 function generate_custom_slug($property_data) {
     // Clean and process each part of the slug
     $city = isset($property_data['City']) ? clean_slug_part($property_data['City']) : 'unknown-city';
@@ -155,16 +260,10 @@ function generate_custom_slug($property_data) {
     // Handle specific property types
     switch ($property_data['PropertySubType']) {
         case 'Single Family':
-            $property_type = clean_slug_part('Single Family homes');
+            $property_type = clean_slug_part('Single Family home');
             break;
-        case 'Condomiumium':
-            $property_type = clean_slug_part('condos');
-            break;
-        case 'Land':
-            $property_type = clean_slug_part('land');
-            break;
-        case 'Commercial':
-            $property_type = clean_slug_part('commercial');
+        case 'Multi-family':
+                $property_type = clean_slug_part('Multi-family home');
             break;
     }
 
@@ -564,21 +663,21 @@ function update_features($post_id, $property_data) {
 
     $features = [
         'LotFeatures' => 'property-feature',
-        'CommunityFeatures' => 'community-feature',
-        'Appliances' => 'appliance-feature',
-        'OtherEquipment' => 'equipment-feature',
-        'SecurityFeatures' => 'security-feature',
-        'AssociationFeeIncludes' => 'association-feature',
-        'BuildingFeatures' => 'building-feature',
-        'ArchitecturalStyle' => 'architectural-style',
-        'Heating' => 'heating-feature',
-        'Basement' => 'basement-feature',
-        'ExteriorFeatures' => 'exterior-feature',
-        'FoundationDetails' => 'foundation-feature',
-        'ParkingFeatures' => 'parking-feature',
-        'StructureType' => 'structure-feature',
-        'WaterSource' => 'water-source-feature',
-        'Utilities' => 'utilities-feature'
+        'CommunityFeatures' => 'property-feature',
+        'Appliances' => 'property-feature',
+        'OtherEquipment' => 'property-feature',
+        'SecurityFeatures' => 'property-feature',
+        'AssociationFeeIncludes' => 'property-feature',
+        'BuildingFeatures' => 'property-feature',
+        'ArchitecturalStyle' => 'property-style',
+        'Heating' => 'property-feature',
+        'Basement' => 'property-feature',
+        'ExteriorFeatures' => 'property-feature',
+        'FoundationDetails' => 'property-feature',
+        'ParkingFeatures' => 'property-feature',
+        'StructureType' => 'property-feature',
+        'WaterSource' => 'property-feature',
+        'Utilities' => 'property-feature'
     ];
 
     foreach ($features as $key => $taxonomy) {
@@ -850,10 +949,6 @@ function handle_property_subtype($post_id, $property_data) {
     try {
         if (isset($property_data['PropertySubType'])) {
             $property_subtype = $property_data['PropertySubType'];
-
-            if($property_subtype=='Vacant Land'){
-                $property_subtype = 'Land';
-            }
 
             // Check if the PropertySubType already exists in the bv_terms table using dynamic table prefix
             $term = $wpdb->get_row($wpdb->prepare("
