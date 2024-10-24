@@ -12,16 +12,16 @@
 
         <!-- Step 1: Date and Time -->
         <div id="step-1">
-            <h4 class="rh_property__heading">Schedule a Tour</h4>
+            <h4 class="rh_property__heading" style="font-size: 28px;">Schedule a Tour</h4>
 
             <div class="form-group">
                 <label for="tourDate">Choose Date:</label>
-                <input type="date" id="tourDate" name="tour_date" class="form-control" required>
+                <input type="date" id="tourDate" name="tour_date" class="form-control" required onfocus="'showPicker' in this && this.showPicker()">
             </div>
 
             <div class="form-group">
                 <label for="tourTime">Choose Time:</label>
-                <input type="time" id="tourTime" name="tour_time" class="form-control" required>
+                <input type="time" id="tourTime" name="tour_time" class="form-control" required onfocus="'showPicker' in this && this.showPicker()">
             </div>
 
             <button id="nextStep" type="button" class="rh-btn rh-btn-primary">Next</button>
