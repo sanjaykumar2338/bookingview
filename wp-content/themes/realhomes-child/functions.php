@@ -80,8 +80,10 @@ function insert_property_data($property_data) {
         $custom_slug = generate_custom_slug($property_data);
 
         // Prepare the post data for inserting/updating the property
+        $address = $property_data['UnparsedAddress']!='' ? $property_data['UnparsedAddress'] : $property_data['CityRegion'];
+        
         $post_data = array(
-            'post_title' => $property_data['UnparsedAddress'], // Using the UnparsedAddress as the title
+            'post_title' => $address, // Using the UnparsedAddress as the title
             'post_content' => $property_data['PublicRemarks'], // Description or remarks as the content
             'post_status' => 'publish', // You can set it to 'draft' if you don't want it published immediately
             'post_type' => 'property', // Custom post type for properties
