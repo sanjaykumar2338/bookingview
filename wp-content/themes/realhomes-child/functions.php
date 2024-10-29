@@ -387,6 +387,7 @@ function handle_property_status($post_id, $property_data) {
     }
 }
 
+
 // Helper function to check if a property with the given ListingKey exists
 function check_for_existing_property($listing_key) {
     global $wpdb;
