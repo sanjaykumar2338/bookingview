@@ -139,6 +139,10 @@ function insert_property_data($property_data) {
                 $property_subtype = 'Multi Family Home';
             }
 
+            if (isset($property_data['StructureType']) && is_array($property_data['StructureType']) && in_array('Apartment', $property_data['StructureType'])) {
+                $property_subtype = 'Apartment';
+            }            
+
             check_and_insert_property_type_and_relationship($property_subtype, $post_id);
         }
     } catch (Exception $e) {
