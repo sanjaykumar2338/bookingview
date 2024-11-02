@@ -794,20 +794,32 @@ function check_and_insert_term($term_name, $term_slug, $taxonomy = 'property-fea
 }
 
 function insert_property_images($post_id, $media_array) {
+    global $wpdb;
     try {
         if (!empty($media_array) && is_array($media_array)) {
             // First, delete all old images associated with the post from the media library and meta table
-            $existing_images = get_post_meta($post_id, 'REAL_HOMES_property_images', true);
+            $attachments = get_attached_media( '', $post_id );
+            foreach ($attachments as $attachment) {
+                wp_delete_attachment( $attachment->ID, 'true' );
+            }
 
             if (!empty($existing_images) && is_array($existing_images)) {
                 foreach ($existing_images as $image_id) {
-                    // Delete the image attachment from the media library
+                    // Delete the image attachment from the media library permanently
                     wp_delete_attachment($image_id, true);
                 }
             }
 
-            // Reset the REAL_HOMES_property_images meta key
-            delete_post_meta($post_id, 'REAL_HOMES_property_images');
+            $meta_key = 'REAL_HOMES_property_images';
+            $meta_ids = $wpdb->get_col($wpdb->prepare(
+                "SELECT meta_id FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = %s",
+                $post_id,
+                $meta_key
+            ));
+
+            foreach ($meta_ids as $meta_id) {
+                delete_metadata('post', $post_id, $meta_key, '', true);
+            }
 
             // Ensure media functions are available
             if (!function_exists('media_sideload_image')) {
