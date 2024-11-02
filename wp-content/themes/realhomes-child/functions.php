@@ -257,9 +257,8 @@ function check_and_insert_property_type_and_relationship($term_name, $post_id, $
 }
 
 function clean_slug_part($part) {
-    // Remove any underscores and replace spaces with dashes, then clean out non-alphanumeric characters
-    $part = str_replace('_', '', $part); // Remove underscores
-    $part = strtolower(str_replace(' ', '-', $part)); // Replace spaces with dashes
+    // Replace underscores and spaces with dashes, then clean out non-alphanumeric characters except dashes
+    $part = strtolower(str_replace(['_', ' '], '-', $part)); // Replace underscores and spaces with dashes
     return preg_replace('/[^a-z0-9-]/', '', $part); // Remove any character that is not a-z, 0-9, or -
 }
 
