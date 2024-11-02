@@ -256,6 +256,13 @@ function check_and_insert_property_type_and_relationship($term_name, $post_id, $
     }
 }
 
+function clean_slug_part($part) {
+    // Remove any underscores and replace spaces with dashes, then clean out non-alphanumeric characters
+    $part = str_replace('_', '', $part); // Remove underscores
+    $part = strtolower(str_replace(' ', '-', $part)); // Replace spaces with dashes
+    return preg_replace('/[^a-z0-9-]/', '', $part); // Remove any character that is not a-z, 0-9, or -
+}
+
 function generate_custom_slug($property_data) {
     // Clean and process each part of the slug
     $city = isset($property_data['City']) ? clean_slug_part($property_data['City']) : 'unknown-city';
@@ -269,16 +276,12 @@ function generate_custom_slug($property_data) {
             $property_type = clean_slug_part('Single Family home');
             break;
         case 'Multi-family':
-                $property_type = clean_slug_part('Multi-family home');
+            $property_type = clean_slug_part('Multi-family home');
             break;
     }
 
     // Construct the custom slug with cleaned parts
     return "ab/{$city}/{$city_region}/{$property_type}-for-sale/{$address}";
-}
-
-function clean_slug_part($part) {
-    return preg_replace('/[^A-Za-z0-9-]/', '', strtolower(str_replace(' ', '-', $part)));
 }
 
 function handle_property_status($post_id, $property_data) {
